@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PLT Trader Desk – Live</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body,#root{height:100%;}
+    body{overflow:hidden;background:#000;}
+    ::-webkit-scrollbar{width:3px;height:3px;}
+    ::-webkit-scrollbar-track{background:#000;}
+    ::-webkit-scrollbar-thumb{background:#14202a;border-radius:4px;}
+    input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+    input,button{outline:none;}
+    button{cursor:pointer;font-family:'Inter',system-ui,sans-serif;}
+    @keyframes tickScroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+        ResponsiveContainer, BarChart, Bar } = Recharts;
+
+const SYMBOLS = [
+  { id:"btcusdt",  name:"BTC/USDT",  base:"BTC",  short:"BTC-USD"  },
+  { id:"ethusdt",  name:"ETH/USDT",  base:"ETH",  short:"ETH-USD"  },
+  { id:"bnbusdt",  name:"BNB/USDT",  base:"BNB",  short:"BNB-USD"  },
+  { id:"solusdt",  name:"SOL/USDT",  base:"SOL",  short:"SOL-USD"  },
+  { id:"adausdt",  name:"ADA/USDT",  base:"ADA",  short:"ADA-USD"  },
+  { id:"xrpusdt",  name:"XRP/USDT",  base:"XRP",  short:"XRP-USD"  },
+  { id:"dogeusdt", name:"DOGE/USDT", base:"DOGE", short:"DOGE-USD" },
+  { id:"avaxusdt", name:"AVAX/USDT", base:"AVAX", short:"AVAX-USD" },
+];
+const INTERVALS = ["1m","5m","15m","1h","4h","1d"];
+
+const T = {
+  bg:"#000000", panel:"#07090c", surf:"#0c1016", border:"#14202a",
+  teal:"#00c8a0", tealBg:"#002e28", tealDm:"#00604e",
+  green:"#00e676", red:"#ff3c3c",
+  txt1:"#b8ccd8", txt2:"#4e6878", txt3:"#283848",
+  mono:"'IBM Plex Mono','Courier New',monospace",
+};
+
+const fmt  = (n=0,d=2) => (+n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtP = p => {
+  if(!p && p!==0) return "---";
+  if(p>=1000) return fmt(p,2);
+  if(p>=1)    return fmt(p,4);
+  return fmt(p,6);
+};
+
+function TraderDesk() {
+  const [sym,    setSym]    = useState(SYMBOLS[0]);
+  const [tfm,    setTfm]    = useState("5m");
+  const [tickers,setTickers]= useState({});
+  const [klines, setKlines] = useState([]);
+  const [book,   setBook]   = useState({bids:[],asks:[]});
+  const [trades, setTrades] = useState([]);
+  const [mtab,   setMtab]   = useState("chart");
+  const [mobile, setMobile] = useState(false);
+  const [port,   setPort]   = useState({balance:10000,positions:[],orders:[]});
+  const [form,   setForm]   = useState({side:"buy",type:"limit",qty:"",price:""});
+  const [live,   setLive]   = useState(false);
+  const [pulse,  setPulse]  = useState({});
+
+  const wsT  = useRef(null);
+  const wsD  = useRef(null);
+  const wsTr = useRef(null);
+
+  useEffect(()=>{
+    const chk=()=>setMobile(window.innerWidth<860);
+    chk();
+    window.addEventListener("resize",chk);
+    return()=>window.removeEventListener("resize",chk);
+  },[]);
+
+  // Combined ticker stream
+  useEffect(()=>{
+    const streams=SYMBOLS.map(s=>`${s.id}@ticker`).join("/");
+    const ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+    ws.onopen =()=>setLive(true);
+    ws.onclose=()=>setLive(false);
+    ws.onerror=()=>setLive(false);
+    ws.onmessage=({data})=>{
+      const {data:d}=JSON.parse(data);
+      if(!d) return;
+      const key=d.s.toLowerCase();
+      setTickers(prev=>{
+        const old=prev[key]?.price, cur=+d.c;
+        if(old&&old!==cur) setPulse(p=>({...p,[key]:cur>old?1:-1}));
+        return {...prev,[key]:{price:cur,change:+d.P,high:+d.h,low:+d.l,vol:+d.v,qvol:+d.q}};
+      });
+      setTimeout(()=>setPulse(p=>({...p,[d.s.toLowerCase()]:0})),400);
+    };
+    wsT.current=ws;
+    return()=>ws.close();
+  },[]);
+
+  // Order book stream
+  useEffect(()=>{
+    wsD.current?.close();
+    const ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.id}@depth20@100ms`);
+    ws.onmessage=({data})=>{
+      const d=JSON.parse(data);
+      setBook({
+        bids:(d.bids||[]).slice(0,13).map(([p,q])=>({p:+p,q:+q})),
+        asks:(d.asks||[]).slice(0,13).map(([p,q])=>({p:+p,q:+q})),
+      });
+    };
+    wsD.current=ws;
+    return()=>ws.close();
+  },[sym.id]);
+
+  // Trade stream
+  useEffect(()=>{
+    wsTr.current?.close();
+    const ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.id}@trade`);
+    ws.onmessage=({data})=>{
+      const d=JSON.parse(data);
+      setTrades(prev=>[{p:+d.p,q:+d.q,t:new Date(d.T).toLocaleTimeString(),buy:!d.m},...prev].slice(0,80));
+    };
+    wsTr.current=ws;
+    return()=>ws.close();
+  },[sym.id]);
+
+  // Klines REST
+  useEffect(()=>{
+    const load=async()=>{
+      try{
+        const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym.id.toUpperCase()}&interval=${tfm}&limit=120`);
+        const raw=await r.json();
+        if(!Array.isArray(raw)) return;
+        setKlines(raw.map(k=>({
+          t:new Date(+k[0]).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
+          o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5],
+        })));
+      }catch(e){}
+    };
+    load();
+    const tmr=window.setInterval(load,30000);
+    return()=>window.clearInterval(tmr);
+  },[sym.id,tfm]);
+
+  const ticker=tickers[sym.id]||{};
+  const cp=ticker.price||0;
+  const chg=ticker.change||0;
+  const isUp=chg>=0;
+  const maxB=Math.max(...book.bids.map(b=>b.q),1);
+  const maxA=Math.max(...book.asks.map(a=>a.q),1);
+
+  const totalPnl=port.positions.reduce((s,pos)=>{
+    const t=tickers[SYMBOLS.find(x=>x.name===pos.sym)?.id];
+    return s+(t?(t.price-pos.avg)*pos.qty:0);
+  },0);
+
+  const placeOrder=()=>{
+    const price=form.type==="market"?cp:+form.price;
+    const qty=+form.qty;
+    if(!qty||qty<=0||!price) return;
+    const total=price*qty;
+    if(form.side==="buy"&&total>port.balance) return;
+    setPort(prev=>{
+      const nb=form.side==="buy"?prev.balance-total:prev.balance+total;
+      let pos=[...prev.positions];
+      const idx=pos.findIndex(p=>p.sym===sym.name);
+      if(form.side==="buy"){
+        if(idx>=0){
+          const nq=pos[idx].qty+qty;
+          pos[idx]={...pos[idx],qty:nq,avg:(pos[idx].avg*pos[idx].qty+price*qty)/nq};
+        } else pos.push({sym:sym.name,base:sym.base,qty,avg:price});
+      } else if(idx>=0){
+        const nq=pos[idx].qty-qty;
+        if(nq<=0.000001) pos.splice(idx,1);
+        else pos[idx]={...pos[idx],qty:nq};
+      }
+      return{
+        balance:nb,positions:pos,
+        orders:[{id:Date.now(),sym:sym.name,side:form.side,price,qty,total,at:new Date().toLocaleTimeString()},...prev.orders].slice(0,30)
+      };
+    });
+    setForm(f=>({...f,qty:"",price:""}));
+  };
+
+  /* ── Render helpers ── */
+  const renderWatchlist=()=>(
+    <div style={{flex:1,overflow:"auto"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",padding:"3px 8px",
+                   fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:.8,
+                   borderBottom:`1px solid ${T.border}`}}>
+        <span>Symbol</span><span style={{textAlign:"right"}}>Price</span>
+        <span style={{textAlign:"right",paddingLeft:8}}>Chg%</span>
+      </div>
+      {SYMBOLS.map(s=>{
+        const tk=tickers[s.id]||{};
+        const up=(tk.change||0)>=0;
+        const sel=sym.id===s.id;
+        const fl=pulse[s.id];
+        return(
+          <div key={s.id} onClick={()=>setSym(s)}
+               style={{display:"grid",gridTemplateColumns:"1fr auto auto",padding:"4px 8px",
+                       cursor:"pointer",gap:4,
+                       background:sel?T.tealBg:fl===1?"rgba(0,230,118,.05)":fl===-1?"rgba(255,60,60,.05)":"transparent",
+                       borderLeft:`2px solid ${sel?T.teal:"transparent"}`,transition:"background .25s"}}>
+            <span style={{fontSize:10,fontWeight:sel?700:500,color:sel?T.teal:T.txt2,fontFamily:T.mono}}>{s.short}</span>
+            <span style={{fontSize:10,color:tk.price?(up?T.green:T.red):T.txt3,fontFamily:T.mono,textAlign:"right"}}>{fmtP(tk.price)}</span>
+            <span style={{fontSize:9,color:up?T.green:T.red,fontFamily:T.mono,textAlign:"right",paddingLeft:6}}>
+              {(tk.change||0)>=0?"+":""}{fmt(tk.change||0,2)}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderBook=()=>(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr auto",padding:"3px 8px",fontSize:9,
+                   color:T.txt3,textTransform:"uppercase",letterSpacing:.5,borderBottom:`1px solid ${T.border}`}}>
+        <span>Price</span><span>Qty</span>
+      </div>
+      <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",overflow:"hidden"}}>
+        {[...book.asks].reverse().map((a,i)=>(
+          <div key={i} style={{position:"relative",padding:"1.5px 8px",display:"flex",justifyContent:"space-between"}}>
+            <div style={{position:"absolute",left:0,top:0,bottom:0,background:"rgba(255,60,60,.08)",width:`${(a.q/maxA)*100}%`}}/>
+            <span style={{fontSize:10,color:T.red,fontFamily:T.mono}}>{fmtP(a.p)}</span>
+            <span style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{a.q.toFixed(3)}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:"5px 8px",background:T.surf,borderTop:`1px solid ${T.border}`,
+                   borderBottom:`1px solid ${T.border}`,textAlign:"center"}}>
+        <span style={{fontSize:13,fontWeight:800,color:isUp?T.green:T.red,fontFamily:T.mono}}>{fmtP(cp)}</span>
+        <span style={{fontSize:8,color:T.txt3,marginLeft:6}}>LAST</span>
+      </div>
+      <div style={{flex:1,overflow:"hidden"}}>
+        {book.bids.map((b,i)=>(
+          <div key={i} style={{position:"relative",padding:"1.5px 8px",display:"flex",justifyContent:"space-between"}}>
+            <div style={{position:"absolute",left:0,top:0,bottom:0,background:"rgba(0,230,118,.07)",width:`${(b.q/maxB)*100}%`}}/>
+            <span style={{fontSize:10,color:T.green,fontFamily:T.mono}}>{fmtP(b.p)}</span>
+            <span style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{b.q.toFixed(3)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderTrades=()=>(
+    <div style={{overflow:"auto",height:"100%"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"3px 8px",fontSize:9,
+                   color:T.txt3,textTransform:"uppercase",borderBottom:`1px solid ${T.border}`}}>
+        <span>Price</span><span style={{textAlign:"right"}}>Qty</span><span style={{textAlign:"right"}}>Time</span>
+      </div>
+      {trades.map((tr,i)=>(
+        <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"1.5px 8px"}}>
+          <span style={{fontSize:10,color:tr.buy?T.green:T.red,fontFamily:T.mono}}>{fmtP(tr.p)}</span>
+          <span style={{fontSize:10,textAlign:"right",color:T.txt2,fontFamily:T.mono}}>{tr.q.toFixed(4)}</span>
+          <span style={{fontSize:10,textAlign:"right",color:T.txt3}}>{tr.t}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderChart=()=>(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
+      <div style={{padding:"4px 10px",borderBottom:`1px solid ${T.border}`,display:"flex",
+                   gap:3,alignItems:"center",flexShrink:0,background:T.panel}}>
+        {INTERVALS.map(iv=>(
+          <button key={iv} onClick={()=>setTfm(iv)}
+                  style={{padding:"2px 7px",background:tfm===iv?T.tealBg:"transparent",
+                          color:tfm===iv?T.teal:T.txt3,border:`1px solid ${tfm===iv?T.tealDm:"transparent"}`,
+                          borderRadius:3,fontSize:10,fontWeight:tfm===iv?700:400}}>
+            {iv}
+          </button>
+        ))}
+        <div style={{marginLeft:"auto",display:"flex",gap:14,fontSize:9,color:T.txt3,alignItems:"center"}}>
+          <span>H: <span style={{color:T.green,fontFamily:T.mono}}>{fmtP(ticker.high)}</span></span>
+          <span>L: <span style={{color:T.red,fontFamily:T.mono}}>{fmtP(ticker.low)}</span></span>
+          <span>V: <span style={{color:T.txt2,fontFamily:T.mono}}>{fmt(ticker.vol||0,0)}</span></span>
+        </div>
+      </div>
+      <div style={{flex:"0 0 65%",minHeight:0}}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={klines} margin={{top:6,right:4,left:0,bottom:0}}>
+            <CartesianGrid strokeDasharray="1 6" stroke={T.border}/>
+            <XAxis dataKey="t" tick={{fill:T.txt3,fontSize:9,fontFamily:T.mono}} axisLine={false} tickLine={false}
+                   interval={Math.max(1,Math.floor(klines.length/8))}/>
+            <YAxis tick={{fill:T.txt3,fontSize:9,fontFamily:T.mono}} axisLine={false} tickLine={false}
+                   domain={["auto","auto"]} tickFormatter={fmtP} width={65}/>
+            <Tooltip contentStyle={{background:T.panel,border:`1px solid ${T.tealDm}`,borderRadius:4,fontSize:10,fontFamily:T.mono}}
+                     labelStyle={{color:T.txt2}} formatter={v=>[fmtP(v),"Close"]}/>
+            <Line type="monotone" dataKey="c" stroke={T.teal} strokeWidth={1.5} dot={false}/>
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{flex:"0 0 33%",minHeight:0}}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={klines} margin={{top:2,right:4,left:0,bottom:0}}>
+            <XAxis hide/><YAxis hide/>
+            <Tooltip contentStyle={{background:T.panel,border:`1px solid ${T.border}`,fontSize:10,fontFamily:T.mono}}
+                     formatter={v=>[fmt(v,0),"Vol"]} labelFormatter={()=>""}/>
+            <Bar dataKey="v" fill={T.tealDm}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  const renderOrderEntry=()=>(
+    <div style={{padding:"8px 10px",background:T.panel,borderTop:`1px solid ${T.border}`,flexShrink:0}}>
+      <div style={{display:"flex",gap:3,marginBottom:6}}>
+        {["buy","sell"].map(side=>(
+          <button key={side} onClick={()=>setForm(f=>({...f,side}))}
+                  style={{flex:1,padding:"5px 0",
+                          background:form.side===side?(side==="buy"?"#062b1a":"#2e0a0a"):T.surf,
+                          color:form.side===side?(side==="buy"?T.green:T.red):T.txt3,
+                          border:`1px solid ${form.side===side?(side==="buy"?T.green:T.red):T.border}`,
+                          borderRadius:3,fontWeight:700,fontSize:10,textTransform:"uppercase",letterSpacing:.5}}>
+            {side}
+          </button>
+        ))}
+        {["limit","market"].map(type=>(
+          <button key={type} onClick={()=>setForm(f=>({...f,type}))}
+                  style={{flex:1,padding:"5px 0",
+                          background:form.type===type?T.surf:"transparent",
+                          color:form.type===type?T.txt1:T.txt3,
+                          border:`1px solid ${form.type===type?T.border:"transparent"}`,
+                          borderRadius:3,fontSize:9,textTransform:"capitalize"}}>
+            {type}
+          </button>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:form.type==="limit"?"1fr 1fr":"1fr",gap:4,marginBottom:5}}>
+        {form.type==="limit"&&(
+          <div>
+            <div style={{fontSize:8,color:T.txt3,marginBottom:2,textTransform:"uppercase"}}>Price</div>
+            <input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))}
+                   placeholder={fmtP(cp)}
+                   style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,borderRadius:3,
+                           padding:"4px 6px",color:T.txt1,fontSize:11,fontFamily:T.mono,boxSizing:"border-box"}}/>
+          </div>
+        )}
+        <div>
+          <div style={{fontSize:8,color:T.txt3,marginBottom:2,textTransform:"uppercase"}}>Qty ({sym.base})</div>
+          <input type="number" value={form.qty} onChange={e=>setForm(f=>({...f,qty:e.target.value}))}
+                 placeholder="0.0000"
+                 style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,borderRadius:3,
+                         padding:"4px 6px",color:T.txt1,fontSize:11,fontFamily:T.mono,boxSizing:"border-box"}}/>
+        </div>
+      </div>
+      {form.qty&&<div style={{fontSize:9,color:T.txt3,marginBottom:5,fontFamily:T.mono}}>
+        ≈ ${fmt((+form.qty||0)*(+form.price||cp))}
+      </div>}
+      <button onClick={placeOrder}
+              style={{width:"100%",padding:7,background:form.side==="buy"?T.green:T.red,
+                      color:"#000",border:"none",borderRadius:3,fontWeight:800,fontSize:11,letterSpacing:.5}}>
+        {form.side==="buy"?"▲ BUY":"▼ SELL"} {sym.base}
+      </button>
+    </div>
+  );
+
+  /* ── Positions sub-render ── */
+  const renderPositions=()=>(
+    <div style={{borderTop:`1px solid ${T.border}`,background:T.panel}}>
+      <div style={{padding:"5px 8px",fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:1}}>Positions</div>
+      {port.positions.length===0
+        ?<div style={{padding:"6px 8px",fontSize:9,color:T.txt3,textAlign:"center"}}>—</div>
+        :port.positions.map((pos,i)=>{
+          const tk=tickers[SYMBOLS.find(x=>x.name===pos.sym)?.id]||{};
+          const ppnl=tk.price?(tk.price-pos.avg)*pos.qty:0;
+          return(
+            <div key={i} style={{padding:"4px 8px",borderTop:`1px solid ${T.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:10,fontWeight:600,color:T.txt2,fontFamily:T.mono}}>{pos.base}</span>
+                <span style={{fontSize:10,color:ppnl>=0?T.green:T.red,fontFamily:T.mono}}>{ppnl>=0?"+":""}${fmt(ppnl)}</span>
+              </div>
+              <div style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{pos.qty.toFixed(5)} @ {fmtP(pos.avg)}</div>
+            </div>
+          );
+        })
+      }
+    </div>
+  );
+
+  const renderOrders=()=>(
+    <div style={{borderTop:`1px solid ${T.border}`,background:T.panel}}>
+      <div style={{padding:"5px 8px",fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:1}}>Orders</div>
+      {port.orders.length===0
+        ?<div style={{padding:"6px 8px",fontSize:9,color:T.txt3,textAlign:"center"}}>—</div>
+        :port.orders.slice(0,6).map(o=>(
+          <div key={o.id} style={{padding:"3px 8px",borderTop:`1px solid ${T.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:9,color:o.side==="buy"?T.green:T.red,fontWeight:700,fontFamily:T.mono,textTransform:"uppercase"}}>
+                {o.side} {o.sym.split("/")[0]}
+              </span>
+              <span style={{fontSize:8,color:T.teal}}>✓</span>
+            </div>
+            <div style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{o.qty.toFixed(4)} @ {fmtP(o.price)}</div>
+          </div>
+        ))
+      }
+    </div>
+  );
+
+  /* ══ MAIN RENDER ══ */
+  return (
+    <div style={{fontFamily:"'Inter',system-ui,sans-serif",background:T.bg,color:T.txt1,
+                 height:"100vh",display:"flex",flexDirection:"column",fontSize:12,overflow:"hidden"}}>
+
+      {/* HEADER */}
+      <div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,padding:"6px 12px",
+                   display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,fontWeight:700,color:T.txt3,letterSpacing:1.5,textTransform:"uppercase"}}>PLT Trader Desk</span>
+        <div style={{width:1,height:12,background:T.border}}/>
+        <div style={{background:T.tealBg,border:`1px solid ${T.tealDm}`,borderRadius:2,padding:"2px 8px"}}>
+          <span style={{fontSize:11,fontWeight:700,color:T.teal,fontFamily:T.mono}}>{sym.short}</span>
+        </div>
+        <span style={{fontSize:18,fontWeight:800,color:isUp?T.green:T.red,fontFamily:T.mono}}>{fmtP(cp)}</span>
+        <span style={{fontSize:11,color:isUp?T.green:T.red,fontWeight:600,fontFamily:T.mono}}>
+          {isUp?"▲":"▼"}{Math.abs(chg).toFixed(2)}%
+        </span>
+        <div style={{width:1,height:12,background:T.border}}/>
+        <span style={{fontSize:9,color:T.txt3}}>BAL: <span style={{color:T.txt1,fontFamily:T.mono}}>${fmt(port.balance)}</span></span>
+        <span style={{fontSize:9,color:T.txt3}}>P&L: <span style={{color:totalPnl>=0?T.green:T.red,fontFamily:T.mono}}>{totalPnl>=0?"+":""}${fmt(totalPnl)}</span></span>
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5}}>
+          <span style={{width:5,height:5,borderRadius:"50%",background:live?T.teal:T.txt3,display:"inline-block"}}/>
+          <span style={{fontSize:8,color:live?T.teal:T.txt3,textTransform:"uppercase",letterSpacing:1.5}}>{live?"LIVE":"CONNECTING..."}</span>
+        </div>
+      </div>
+
+      {mobile ? (
+        <>
+          {/* MOBILE – symbol strip */}
+          <div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,display:"flex",overflowX:"auto",flexShrink:0}}>
+            {SYMBOLS.map(s=>{
+              const tk=tickers[s.id]||{};
+              const up=(tk.change||0)>=0;
+              const sel=sym.id===s.id;
+              return(
+                <div key={s.id} onClick={()=>setSym(s)}
+                     style={{padding:"5px 12px",cursor:"pointer",flexShrink:0,minWidth:80,
+                             borderBottom:`2px solid ${sel?T.teal:"transparent"}`,background:sel?T.tealBg:"transparent"}}>
+                  <div style={{fontSize:9,fontWeight:600,color:sel?T.teal:T.txt3,fontFamily:T.mono}}>{s.short}</div>
+                  <div style={{fontSize:11,color:up?T.green:T.red,fontFamily:T.mono}}>{fmtP(tk.price)}</div>
+                </div>
+              );
+            })}
+          </div>
+          {/* MOBILE – tabs */}
+          <div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,display:"flex",flexShrink:0}}>
+            {[["chart","Chart"],["book","Book"],["trades","Trades"],["order","Order"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setMtab(k)}
+                      style={{flex:1,padding:"8px 4px",background:"transparent",
+                              color:mtab===k?T.teal:T.txt3,border:"none",
+                              borderBottom:`2px solid ${mtab===k?T.teal:"transparent"}`,
+                              fontSize:11,fontWeight:600}}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {/* MOBILE – panels */}
+          <div style={{flex:1,minHeight:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            {mtab==="chart"  && <div style={{flex:1,minHeight:0}}>{renderChart()}</div>}
+            {mtab==="book"   && <div style={{flex:1,minHeight:0}}>{renderBook()}</div>}
+            {mtab==="trades" && <div style={{flex:1,minHeight:0}}>{renderTrades()}</div>}
+            {mtab==="order"  && (
+              <div style={{flex:1,overflow:"auto",padding:10}}>
+                {renderOrderEntry()}
+                <div style={{marginTop:10}}>{renderPositions()}</div>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* DESKTOP – 4-column grid */
+        <div style={{display:"grid",gridTemplateColumns:"172px 1fr 172px 155px",
+                     gap:1,background:T.border,flex:1,minHeight:0}}>
+
+          {/* COL 1: Watchlist + Positions */}
+          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden"}}>
+            <div style={{padding:"5px 8px",borderBottom:`1px solid ${T.border}`,fontSize:9,color:T.txt3,
+                         textTransform:"uppercase",letterSpacing:1,background:T.panel,
+                         display:"flex",justifyContent:"space-between"}}>
+              <span>Watchlist</span><span style={{color:T.teal}}>8 pairs</span>
+            </div>
+            {renderWatchlist()}
+            {renderPositions()}
+          </div>
+
+          {/* COL 2: Chart + Order Entry */}
+          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0}}>
+            <div style={{flex:1,minHeight:0}}>{renderChart()}</div>
+            {renderOrderEntry()}
+          </div>
+
+          {/* COL 3: Order Book */}
+          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0}}>
+            <div style={{padding:"5px 8px",borderBottom:`1px solid ${T.border}`,fontSize:9,color:T.txt3,
+                         textTransform:"uppercase",letterSpacing:1,background:T.panel,
+                         display:"flex",justifyContent:"space-between"}}>
+              <span>Order Book</span>
+              <span><span style={{color:T.red}}>A</span>/<span style={{color:T.green}}>B</span></span>
+            </div>
+            <div style={{flex:1,minHeight:0}}>{renderBook()}</div>
+          </div>
+
+          {/* COL 4: Trade Feed + Orders */}
+          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0}}>
+            <div style={{padding:"5px 8px",borderBottom:`1px solid ${T.border}`,fontSize:9,color:T.txt3,
+                         textTransform:"uppercase",letterSpacing:1,background:T.panel}}>
+              Trade Feed
+            </div>
+            <div style={{flex:1,minHeight:0}}>{renderTrades()}</div>
+            {renderOrders()}
+          </div>
+        </div>
+      )}
+
+      {/* TICKER TAPE */}
+      <div style={{background:T.panel,borderTop:`1px solid ${T.border}`,overflow:"hidden",flexShrink:0,height:24}}>
+        <div style={{display:"inline-flex",animation:"tickScroll 45s linear infinite",
+                     whiteSpace:"nowrap",height:"100%",alignItems:"center"}}>
+          {[0,1].map(ri=>(
+            <span key={ri} style={{display:"inline-flex"}}>
+              {SYMBOLS.map(s=>{
+                const tk=tickers[s.id]||{};
+                const up=(tk.change||0)>=0;
+                return(
+                  <span key={s.id} style={{display:"inline-flex",alignItems:"center",gap:5,
+                                           padding:"0 18px",fontSize:9,borderRight:`1px solid ${T.border}`}}>
+                    <span style={{color:T.txt3,fontFamily:T.mono}}>{s.short}</span>
+                    <span style={{color:up?T.green:T.red,fontFamily:T.mono}}>{fmtP(tk.price)}</span>
+                    <span style={{fontSize:8,color:up?T.green:T.red,fontFamily:T.mono}}>
+                      {up?"▲":"▼"}{fmt(Math.abs(tk.change||0),2)}%
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<TraderDesk />);
+</script>
+</body>
+</html>
