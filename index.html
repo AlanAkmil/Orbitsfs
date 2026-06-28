@@ -1,557 +1,574 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PLT Trader Desk – Live</title>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    html,body,#root{height:100%;}
-    body{overflow:hidden;background:#000;}
-    ::-webkit-scrollbar{width:3px;height:3px;}
-    ::-webkit-scrollbar-track{background:#000;}
-    ::-webkit-scrollbar-thumb{background:#14202a;border-radius:4px;}
-    input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
-    input,button{outline:none;}
-    button{cursor:pointer;font-family:'Inter',system-ui,sans-serif;}
-    @keyframes tickScroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>PLT Trader Desk</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:#000;color:#b8ccd8;font-family:'Inter',system-ui,sans-serif;font-size:12px}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:#000}
+::-webkit-scrollbar-thumb{background:#14202a;border-radius:2px}
+input::-webkit-inner-spin-button{-webkit-appearance:none}
+input,button{outline:none;font-family:inherit}
+button{cursor:pointer}
+.mono{font-family:'IBM Plex Mono','Courier New',monospace}
+.g{color:#00e676}.r{color:#ff3c3c}.t{color:#00c8a0}.d{color:#283848}
+#app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* HEADER */
+#hdr{background:#07090c;border-bottom:1px solid #14202a;padding:6px 12px;
+     display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;min-height:36px}
+.logo{font-size:10px;font-weight:700;color:#283848;text-transform:uppercase;letter-spacing:1.5px}
+.sep{width:1px;height:12px;background:#14202a;flex-shrink:0}
+#sym-badge{background:#002e28;border:1px solid #00604e;border-radius:2px;padding:2px 8px}
+#h-sym{font-size:11px;font-weight:700;color:#00c8a0;font-family:'IBM Plex Mono',monospace}
+#h-price{font-size:18px;font-weight:800;font-family:'IBM Plex Mono',monospace}
+#h-chg{font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+#h-bal,#h-pnl{font-size:9px;color:#283848}
+#h-bal b,#h-pnl b{font-weight:600;font-family:'IBM Plex Mono',monospace}
+#h-live{margin-left:auto;display:flex;align-items:center;gap:5px}
+#live-dot{width:5px;height:5px;border-radius:50%;background:#283848;display:inline-block}
+#live-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:#283848}
+.live-on #live-dot{background:#00c8a0}
+.live-on #live-lbl{color:#00c8a0}
+
+/* DESKTOP GRID */
+#grid{display:grid;grid-template-columns:172px 1fr 172px 155px;gap:1px;background:#14202a;flex:1;min-height:0}
+.col{background:#000;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.ph{padding:5px 8px;font-size:9px;color:#283848;text-transform:uppercase;letter-spacing:1px;
+    background:#07090c;border-bottom:1px solid #14202a;display:flex;justify-content:space-between;
+    align-items:center;flex-shrink:0}
+.phs{padding:4px 8px;font-size:9px;color:#283848;text-transform:uppercase;letter-spacing:1px}
+
+/* WATCHLIST */
+#wl-list{flex:1;overflow:auto}
+.wl-hdr-row{display:grid;grid-template-columns:1fr auto auto;padding:3px 8px;font-size:9px;
+             color:#283848;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #14202a;flex-shrink:0}
+.wl-r{display:grid;grid-template-columns:1fr auto auto;padding:4px 8px;cursor:pointer;gap:4px;
+       border-left:2px solid transparent;transition:background .2s}
+.wl-r.on{background:#002e28;border-left-color:#00c8a0}
+.wl-s{font-size:10px;font-weight:500;color:#4e6878;font-family:'IBM Plex Mono',monospace}
+.wl-r.on .wl-s{color:#00c8a0;font-weight:700}
+.wl-p,.wl-c{font-size:10px;text-align:right;font-family:'IBM Plex Mono',monospace}
+.wl-c{font-size:9px;padding-left:6px}
+#pos-sec{border-top:1px solid #14202a;background:#07090c;flex-shrink:0}
+.pos-r{padding:4px 8px;border-top:1px solid #14202a}
+.pos-top{display:flex;justify-content:space-between;margin-bottom:1px}
+.pos-b{font-size:10px;font-weight:600;color:#4e6878;font-family:'IBM Plex Mono',monospace}
+.pos-p{font-size:10px;font-family:'IBM Plex Mono',monospace}
+.pos-d{font-size:9px;color:#283848;font-family:'IBM Plex Mono',monospace}
+.empty{padding:6px 8px;font-size:9px;color:#283848;text-align:center}
+@keyframes flashG{0%,100%{background:transparent}50%{background:rgba(0,230,118,.07)}}
+@keyframes flashR{0%,100%{background:transparent}50%{background:rgba(255,60,60,.07)}}
+.fg{animation:flashG .35s ease}
+.fr{animation:flashR .35s ease}
+
+/* CHART */
+#chart-ctrl{padding:4px 10px;border-bottom:1px solid #14202a;display:flex;gap:3px;align-items:center;flex-shrink:0;background:#07090c}
+.iv{padding:2px 7px;background:transparent;color:#283848;border:1px solid transparent;border-radius:3px;font-size:10px}
+.iv.on{background:#002e28;color:#00c8a0;border-color:#00604e;font-weight:700}
+#chart-stats{margin-left:auto;display:flex;gap:14px;font-size:9px;color:#283848}
+#chart-stats b{font-weight:600;font-family:'IBM Plex Mono',monospace}
+#pc-wrap{flex:0 0 62%;min-height:0;position:relative}
+#vc-wrap{flex:0 0 28%;min-height:0;position:relative}
+#pc-wrap canvas,#vc-wrap canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}
+
+/* ORDER ENTRY */
+#oe{padding:8px 10px;background:#07090c;border-top:1px solid #14202a;flex-shrink:0}
+.oe-side{flex:1;padding:5px 0;border-radius:3px;font-weight:700;font-size:10px;
+          text-transform:uppercase;letter-spacing:.5px;border:1px solid #14202a;background:#0c1016;color:#283848}
+.buy-on{background:#062b1a!important;color:#00e676!important;border-color:#00e676!important}
+.sell-on{background:#2e0a0a!important;color:#ff3c3c!important;border-color:#ff3c3c!important}
+.oe-type{flex:1;padding:5px 0;border-radius:3px;font-size:9px;text-transform:capitalize;
+          border:1px solid transparent;background:transparent;color:#283848}
+.oe-type.on{background:#0c1016;color:#b8ccd8;border-color:#14202a}
+#oe-top{display:flex;gap:3px;margin-bottom:6px}
+#oe-fields{display:grid;gap:4px;margin-bottom:5px}
+.oef label{font-size:8px;color:#283848;text-transform:uppercase;display:block;margin-bottom:2px;letter-spacing:.5px}
+.oef input{width:100%;background:#0c1016;border:1px solid #14202a;border-radius:3px;
+            padding:4px 6px;color:#b8ccd8;font-size:11px;font-family:'IBM Plex Mono',monospace}
+#oe-total{font-size:9px;color:#283848;margin-bottom:5px;font-family:'IBM Plex Mono',monospace;min-height:14px}
+#sub-btn{width:100%;padding:7px;border:none;border-radius:3px;font-weight:800;font-size:11px;letter-spacing:.5px;color:#000}
+
+/* ORDER BOOK */
+.ob-hr{display:grid;grid-template-columns:1fr auto;padding:3px 8px;font-size:9px;
+        color:#283848;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #14202a;flex-shrink:0}
+#ob-asks,#ob-bids{flex:1;overflow:hidden;display:flex;flex-direction:column}
+#ob-asks{justify-content:flex-end}
+.ob-r{position:relative;padding:1.5px 8px;display:flex;justify-content:space-between}
+.ob-bar{position:absolute;left:0;top:0;bottom:0;opacity:.08}
+.ob-p{font-size:10px;font-family:'IBM Plex Mono',monospace}
+.ob-q{font-size:9px;color:#283848;font-family:'IBM Plex Mono',monospace}
+#ob-sp{padding:5px 8px;background:#0c1016;border-top:1px solid #14202a;border-bottom:1px solid #14202a;text-align:center;flex-shrink:0}
+#ob-last{font-size:13px;font-weight:800;font-family:'IBM Plex Mono',monospace}
+
+/* TRADES */
+.tf-hr{display:grid;grid-template-columns:1fr 1fr 1fr;padding:3px 8px;font-size:9px;color:#283848;text-transform:uppercase;border-bottom:1px solid #14202a;flex-shrink:0}
+.tf-hr span:not(:first-child){text-align:right}
+#trades-list{flex:1;overflow:auto}
+.tr-r{display:grid;grid-template-columns:1fr 1fr 1fr;padding:1.5px 8px}
+.tr-p{font-size:10px;font-family:'IBM Plex Mono',monospace}
+.tr-q,.tr-t{font-size:10px;text-align:right;color:#283848;font-family:'IBM Plex Mono',monospace}
+.tr-t{color:#1e3048}
+#ord-sec{border-top:1px solid #14202a;background:#07090c;flex-shrink:0}
+.ord-r{padding:3px 8px;border-top:1px solid #14202a}
+.ord-top{display:flex;justify-content:space-between;margin-bottom:1px}
+.ord-s{font-size:9px;font-weight:700;text-transform:uppercase;font-family:'IBM Plex Mono',monospace}
+.ord-d{font-size:9px;color:#283848;font-family:'IBM Plex Mono',monospace}
+
+/* TICKER TAPE */
+#tape{background:#07090c;border-top:1px solid #14202a;overflow:hidden;flex-shrink:0;height:24px}
+#tape-in{display:inline-flex;animation:tickS 45s linear infinite;white-space:nowrap;height:100%;align-items:center}
+@keyframes tickS{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ti{display:inline-flex;align-items:center;gap:5px;padding:0 18px;font-size:9px;border-right:1px solid #14202a;font-family:'IBM Plex Mono',monospace}
+.ti-s{color:#283848}.ti-p,.ti-c{font-size:9px}
+
+/* MOBILE */
+#mob-strip,#mob-tabs,#mob-ct{display:none}
+@media(max-width:860px){
+  #grid{display:none}
+  #mob-strip{display:flex;background:#07090c;border-bottom:1px solid #14202a;overflow-x:auto;flex-shrink:0}
+  #mob-tabs{display:flex;background:#07090c;border-bottom:1px solid #14202a;flex-shrink:0}
+  #mob-ct{display:flex;flex:1;min-height:0;flex-direction:column;overflow:hidden}
+  .mtab{flex:1;padding:8px 4px;background:transparent;color:#283848;border:none;border-bottom:2px solid transparent;font-size:11px;font-weight:600}
+  .mtab.on{color:#00c8a0;border-bottom-color:#00c8a0}
+  .msi{padding:5px 12px;cursor:pointer;flex-shrink:0;min-width:80px;border-bottom:2px solid transparent;border-bottom-color:transparent}
+  .msi.on{background:#002e28;border-bottom-color:#00c8a0}
+  .msi-s{font-size:9px;font-weight:600;color:#4e6878;font-family:'IBM Plex Mono',monospace}
+  .msi.on .msi-s{color:#00c8a0}
+  .msi-p{font-size:11px;font-family:'IBM Plex Mono',monospace}
+  #mob-pc-wrap,#mob-vc-wrap{position:relative;width:100%}
+  #mob-pc-wrap{flex:0 0 62%;min-height:0}
+  #mob-vc-wrap{flex:0 0 30%;min-height:0}
+  #mob-pc-wrap canvas,#mob-vc-wrap canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}
+}
+</style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef } = React;
-const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-        ResponsiveContainer, BarChart, Bar } = Recharts;
+<div id="app">
 
-const SYMBOLS = [
-  { id:"btcusdt",  name:"BTC/USDT",  base:"BTC",  short:"BTC-USD"  },
-  { id:"ethusdt",  name:"ETH/USDT",  base:"ETH",  short:"ETH-USD"  },
-  { id:"bnbusdt",  name:"BNB/USDT",  base:"BNB",  short:"BNB-USD"  },
-  { id:"solusdt",  name:"SOL/USDT",  base:"SOL",  short:"SOL-USD"  },
-  { id:"adausdt",  name:"ADA/USDT",  base:"ADA",  short:"ADA-USD"  },
-  { id:"xrpusdt",  name:"XRP/USDT",  base:"XRP",  short:"XRP-USD"  },
-  { id:"dogeusdt", name:"DOGE/USDT", base:"DOGE", short:"DOGE-USD" },
-  { id:"avaxusdt", name:"AVAX/USDT", base:"AVAX", short:"AVAX-USD" },
+  <!-- HEADER -->
+  <div id="hdr">
+    <span class="logo">PLT Trader Desk</span>
+    <span class="sep"></span>
+    <div id="sym-badge"><span id="h-sym">BTC-USD</span></div>
+    <span id="h-price">---</span>
+    <span id="h-chg">---</span>
+    <span class="sep"></span>
+    <span id="h-bal">BAL: <b>$10,000.00</b></span>
+    <span id="h-pnl">P&L: <b class="g">$0.00</b></span>
+    <div id="h-live"><span id="live-dot"></span><span id="live-lbl">CONNECTING</span></div>
+  </div>
+
+  <!-- DESKTOP GRID -->
+  <div id="grid">
+
+    <!-- COL 1: Watchlist -->
+    <div class="col">
+      <div class="ph"><span>Watchlist</span><span class="t">8 pairs</span></div>
+      <div class="wl-hdr-row" style="display:grid;grid-template-columns:1fr auto auto;padding:3px 8px;font-size:9px;color:#283848;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #14202a;flex-shrink:0">
+        <span>Symbol</span><span style="text-align:right">Price</span><span style="text-align:right;padding-left:8px">Chg%</span>
+      </div>
+      <div id="wl-list"></div>
+      <div id="pos-sec">
+        <div class="phs">Positions</div>
+        <div id="pos-list"><div class="empty">—</div></div>
+      </div>
+    </div>
+
+    <!-- COL 2: Chart + Order Entry -->
+    <div class="col">
+      <div id="chart-ctrl">
+        <div id="iv-btns"></div>
+        <div id="chart-stats">
+          <span>H: <b id="s-hi" class="g">---</b></span>
+          <span>L: <b id="s-lo" class="r">---</b></span>
+          <span>V: <b id="s-vl" style="color:#4e6878">---</b></span>
+        </div>
+      </div>
+      <div id="pc-wrap"><canvas id="pc"></canvas></div>
+      <div id="vc-wrap"><canvas id="vc"></canvas></div>
+      <div id="oe">
+        <div id="oe-top">
+          <button class="oe-side buy-on" id="ob-buy" onclick="setSide('buy')">Buy</button>
+          <button class="oe-side" id="ob-sell" onclick="setSide('sell')">Sell</button>
+          <button class="oe-type on" id="ot-lim" onclick="setType('limit')">Limit</button>
+          <button class="oe-type" id="ot-mkt" onclick="setType('market')">Market</button>
+        </div>
+        <div id="oe-fields" style="grid-template-columns:1fr 1fr">
+          <div class="oef" id="pf"><label>Price</label><input type="number" id="inp-p" placeholder="---"/></div>
+          <div class="oef"><label id="ql">Qty (BTC)</label><input type="number" id="inp-q" placeholder="0.0000"/></div>
+        </div>
+        <div id="oe-total"></div>
+        <button id="sub-btn" onclick="placeOrder()" style="background:#00e676">▲ BUY BTC</button>
+      </div>
+    </div>
+
+    <!-- COL 3: Order Book -->
+    <div class="col">
+      <div class="ph"><span>Order Book</span><span><span class="r">A</span>/<span class="g">B</span></span></div>
+      <div class="ob-hr"><span>Price</span><span>Qty</span></div>
+      <div id="ob-asks"></div>
+      <div id="ob-sp"><span id="ob-last">---</span><span class="d" style="font-size:8px;margin-left:6px">LAST</span></div>
+      <div id="ob-bids"></div>
+    </div>
+
+    <!-- COL 4: Trades + Orders -->
+    <div class="col">
+      <div class="ph">Trade Feed</div>
+      <div class="tf-hr"><span>Price</span><span>Qty</span><span>Time</span></div>
+      <div id="trades-list"></div>
+      <div id="ord-sec">
+        <div class="phs">Orders</div>
+        <div id="ord-list"><div class="empty">—</div></div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <!-- MOBILE -->
+  <div id="mob-strip"></div>
+  <div id="mob-tabs">
+    <button class="mtab on" onclick="setMtab('chart')">Chart</button>
+    <button class="mtab" onclick="setMtab('book')">Book</button>
+    <button class="mtab" onclick="setMtab('trades')">Trades</button>
+    <button class="mtab" onclick="setMtab('order')">Order</button>
+  </div>
+  <div id="mob-ct"></div>
+
+  <!-- TICKER TAPE -->
+  <div id="tape"><div id="tape-in"></div></div>
+</div>
+
+<script>
+/* ── DATA ────────────────────────── */
+const SYMS=[
+  {id:"btcusdt", name:"BTC/USDT", base:"BTC", short:"BTC-USD"},
+  {id:"ethusdt", name:"ETH/USDT", base:"ETH", short:"ETH-USD"},
+  {id:"bnbusdt", name:"BNB/USDT", base:"BNB", short:"BNB-USD"},
+  {id:"solusdt", name:"SOL/USDT", base:"SOL", short:"SOL-USD"},
+  {id:"adausdt", name:"ADA/USDT", base:"ADA", short:"ADA-USD"},
+  {id:"xrpusdt", name:"XRP/USDT", base:"XRP", short:"XRP-USD"},
+  {id:"dogeusdt",name:"DOGE/USDT",base:"DOGE",short:"DOGE-USD"},
+  {id:"avaxusdt",name:"AVAX/USDT",base:"AVAX",short:"AVAX-USD"},
 ];
-const INTERVALS = ["1m","5m","15m","1h","4h","1d"];
+const IVS=["1m","5m","15m","1h","4h","1d"];
+const TEAL="#00c8a0",GREEN="#00e676",RED="#ff3c3c";
 
-const T = {
-  bg:"#000000", panel:"#07090c", surf:"#0c1016", border:"#14202a",
-  teal:"#00c8a0", tealBg:"#002e28", tealDm:"#00604e",
-  green:"#00e676", red:"#ff3c3c",
-  txt1:"#b8ccd8", txt2:"#4e6878", txt3:"#283848",
-  mono:"'IBM Plex Mono','Courier New',monospace",
-};
+let selIdx=0, chartTfm="5m", mobileTab="chart";
+let tickers={}, klines=[], book={bids:[],asks:[]}, trades=[];
+let portfolio={balance:10000,positions:[],orders:[]};
+let formSide="buy", formType="limit";
+let priceChart=null, volChart=null, mobPC=null, mobVC=null;
+let wsT=null,wsD=null,wsTr=null;
 
-const fmt  = (n=0,d=2) => (+n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
-const fmtP = p => {
-  if(!p && p!==0) return "---";
-  if(p>=1000) return fmt(p,2);
-  if(p>=1)    return fmt(p,4);
-  return fmt(p,6);
-};
+const sym=()=>SYMS[selIdx];
+const fn=(n=0,d=2)=>(+n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const fp=p=>{if(!p&&p!==0)return"---";if(p>=1000)return fn(p,2);if(p>=1)return fn(p,4);return fn(p,6);};
+const el=id=>document.getElementById(id);
+const uc=s=>s.charAt(0).toUpperCase()+s.slice(1);
 
-function TraderDesk() {
-  const [sym,    setSym]    = useState(SYMBOLS[0]);
-  const [tfm,    setTfm]    = useState("5m");
-  const [tickers,setTickers]= useState({});
-  const [klines, setKlines] = useState([]);
-  const [book,   setBook]   = useState({bids:[],asks:[]});
-  const [trades, setTrades] = useState([]);
-  const [mtab,   setMtab]   = useState("chart");
-  const [mobile, setMobile] = useState(false);
-  const [port,   setPort]   = useState({balance:10000,positions:[],orders:[]});
-  const [form,   setForm]   = useState({side:"buy",type:"limit",qty:"",price:""});
-  const [live,   setLive]   = useState(false);
-  const [pulse,  setPulse]  = useState({});
-
-  const wsT  = useRef(null);
-  const wsD  = useRef(null);
-  const wsTr = useRef(null);
-
-  useEffect(()=>{
-    const chk=()=>setMobile(window.innerWidth<860);
-    chk();
-    window.addEventListener("resize",chk);
-    return()=>window.removeEventListener("resize",chk);
-  },[]);
-
-  // Combined ticker stream
-  useEffect(()=>{
-    const streams=SYMBOLS.map(s=>`${s.id}@ticker`).join("/");
-    const ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
-    ws.onopen =()=>setLive(true);
-    ws.onclose=()=>setLive(false);
-    ws.onerror=()=>setLive(false);
-    ws.onmessage=({data})=>{
-      const {data:d}=JSON.parse(data);
-      if(!d) return;
-      const key=d.s.toLowerCase();
-      setTickers(prev=>{
-        const old=prev[key]?.price, cur=+d.c;
-        if(old&&old!==cur) setPulse(p=>({...p,[key]:cur>old?1:-1}));
-        return {...prev,[key]:{price:cur,change:+d.P,high:+d.h,low:+d.l,vol:+d.v,qvol:+d.q}};
-      });
-      setTimeout(()=>setPulse(p=>({...p,[d.s.toLowerCase()]:0})),400);
-    };
-    wsT.current=ws;
-    return()=>ws.close();
-  },[]);
-
-  // Order book stream
-  useEffect(()=>{
-    wsD.current?.close();
-    const ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.id}@depth20@100ms`);
-    ws.onmessage=({data})=>{
-      const d=JSON.parse(data);
-      setBook({
-        bids:(d.bids||[]).slice(0,13).map(([p,q])=>({p:+p,q:+q})),
-        asks:(d.asks||[]).slice(0,13).map(([p,q])=>({p:+p,q:+q})),
-      });
-    };
-    wsD.current=ws;
-    return()=>ws.close();
-  },[sym.id]);
-
-  // Trade stream
-  useEffect(()=>{
-    wsTr.current?.close();
-    const ws=new WebSocket(`wss://stream.binance.com:9443/ws/${sym.id}@trade`);
-    ws.onmessage=({data})=>{
-      const d=JSON.parse(data);
-      setTrades(prev=>[{p:+d.p,q:+d.q,t:new Date(d.T).toLocaleTimeString(),buy:!d.m},...prev].slice(0,80));
-    };
-    wsTr.current=ws;
-    return()=>ws.close();
-  },[sym.id]);
-
-  // Klines REST
-  useEffect(()=>{
-    const load=async()=>{
-      try{
-        const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym.id.toUpperCase()}&interval=${tfm}&limit=120`);
-        const raw=await r.json();
-        if(!Array.isArray(raw)) return;
-        setKlines(raw.map(k=>({
-          t:new Date(+k[0]).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),
-          o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5],
-        })));
-      }catch(e){}
-    };
-    load();
-    const tmr=window.setInterval(load,30000);
-    return()=>window.clearInterval(tmr);
-  },[sym.id,tfm]);
-
-  const ticker=tickers[sym.id]||{};
-  const cp=ticker.price||0;
-  const chg=ticker.change||0;
-  const isUp=chg>=0;
-  const maxB=Math.max(...book.bids.map(b=>b.q),1);
-  const maxA=Math.max(...book.asks.map(a=>a.q),1);
-
-  const totalPnl=port.positions.reduce((s,pos)=>{
-    const t=tickers[SYMBOLS.find(x=>x.name===pos.sym)?.id];
-    return s+(t?(t.price-pos.avg)*pos.qty:0);
-  },0);
-
-  const placeOrder=()=>{
-    const price=form.type==="market"?cp:+form.price;
-    const qty=+form.qty;
-    if(!qty||qty<=0||!price) return;
-    const total=price*qty;
-    if(form.side==="buy"&&total>port.balance) return;
-    setPort(prev=>{
-      const nb=form.side==="buy"?prev.balance-total:prev.balance+total;
-      let pos=[...prev.positions];
-      const idx=pos.findIndex(p=>p.sym===sym.name);
-      if(form.side==="buy"){
-        if(idx>=0){
-          const nq=pos[idx].qty+qty;
-          pos[idx]={...pos[idx],qty:nq,avg:(pos[idx].avg*pos[idx].qty+price*qty)/nq};
-        } else pos.push({sym:sym.name,base:sym.base,qty,avg:price});
-      } else if(idx>=0){
-        const nq=pos[idx].qty-qty;
-        if(nq<=0.000001) pos.splice(idx,1);
-        else pos[idx]={...pos[idx],qty:nq};
-      }
-      return{
-        balance:nb,positions:pos,
-        orders:[{id:Date.now(),sym:sym.name,side:form.side,price,qty,total,at:new Date().toLocaleTimeString()},...prev.orders].slice(0,30)
-      };
-    });
-    setForm(f=>({...f,qty:"",price:""}));
+/* ── WEBSOCKETS ──────────────────── */
+function connectTickers(){
+  const streams=SYMS.map(s=>`${s.id}@ticker`).join("/");
+  wsT=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+  wsT.onopen=()=>setLive(true);
+  wsT.onclose=wsT.onerror=()=>{setLive(false);setTimeout(connectTickers,3000)};
+  wsT.onmessage=({data})=>{
+    const {data:d}=JSON.parse(data);if(!d)return;
+    const key=d.s.toLowerCase();
+    const old=tickers[key]?.price,cur=+d.c;
+    tickers[key]={price:cur,change:+d.P,high:+d.h,low:+d.l,vol:+d.v,qvol:+d.q};
+    if(old&&old!==cur)flashRow(key,cur>old);
+    renderHeader();renderWL();renderTape();renderPos();
   };
-
-  /* ── Render helpers ── */
-  const renderWatchlist=()=>(
-    <div style={{flex:1,overflow:"auto"}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",padding:"3px 8px",
-                   fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:.8,
-                   borderBottom:`1px solid ${T.border}`}}>
-        <span>Symbol</span><span style={{textAlign:"right"}}>Price</span>
-        <span style={{textAlign:"right",paddingLeft:8}}>Chg%</span>
-      </div>
-      {SYMBOLS.map(s=>{
-        const tk=tickers[s.id]||{};
-        const up=(tk.change||0)>=0;
-        const sel=sym.id===s.id;
-        const fl=pulse[s.id];
-        return(
-          <div key={s.id} onClick={()=>setSym(s)}
-               style={{display:"grid",gridTemplateColumns:"1fr auto auto",padding:"4px 8px",
-                       cursor:"pointer",gap:4,
-                       background:sel?T.tealBg:fl===1?"rgba(0,230,118,.05)":fl===-1?"rgba(255,60,60,.05)":"transparent",
-                       borderLeft:`2px solid ${sel?T.teal:"transparent"}`,transition:"background .25s"}}>
-            <span style={{fontSize:10,fontWeight:sel?700:500,color:sel?T.teal:T.txt2,fontFamily:T.mono}}>{s.short}</span>
-            <span style={{fontSize:10,color:tk.price?(up?T.green:T.red):T.txt3,fontFamily:T.mono,textAlign:"right"}}>{fmtP(tk.price)}</span>
-            <span style={{fontSize:9,color:up?T.green:T.red,fontFamily:T.mono,textAlign:"right",paddingLeft:6}}>
-              {(tk.change||0)>=0?"+":""}{fmt(tk.change||0,2)}%
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-
-  const renderBook=()=>(
-    <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr auto",padding:"3px 8px",fontSize:9,
-                   color:T.txt3,textTransform:"uppercase",letterSpacing:.5,borderBottom:`1px solid ${T.border}`}}>
-        <span>Price</span><span>Qty</span>
-      </div>
-      <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",overflow:"hidden"}}>
-        {[...book.asks].reverse().map((a,i)=>(
-          <div key={i} style={{position:"relative",padding:"1.5px 8px",display:"flex",justifyContent:"space-between"}}>
-            <div style={{position:"absolute",left:0,top:0,bottom:0,background:"rgba(255,60,60,.08)",width:`${(a.q/maxA)*100}%`}}/>
-            <span style={{fontSize:10,color:T.red,fontFamily:T.mono}}>{fmtP(a.p)}</span>
-            <span style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{a.q.toFixed(3)}</span>
-          </div>
-        ))}
-      </div>
-      <div style={{padding:"5px 8px",background:T.surf,borderTop:`1px solid ${T.border}`,
-                   borderBottom:`1px solid ${T.border}`,textAlign:"center"}}>
-        <span style={{fontSize:13,fontWeight:800,color:isUp?T.green:T.red,fontFamily:T.mono}}>{fmtP(cp)}</span>
-        <span style={{fontSize:8,color:T.txt3,marginLeft:6}}>LAST</span>
-      </div>
-      <div style={{flex:1,overflow:"hidden"}}>
-        {book.bids.map((b,i)=>(
-          <div key={i} style={{position:"relative",padding:"1.5px 8px",display:"flex",justifyContent:"space-between"}}>
-            <div style={{position:"absolute",left:0,top:0,bottom:0,background:"rgba(0,230,118,.07)",width:`${(b.q/maxB)*100}%`}}/>
-            <span style={{fontSize:10,color:T.green,fontFamily:T.mono}}>{fmtP(b.p)}</span>
-            <span style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{b.q.toFixed(3)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderTrades=()=>(
-    <div style={{overflow:"auto",height:"100%"}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"3px 8px",fontSize:9,
-                   color:T.txt3,textTransform:"uppercase",borderBottom:`1px solid ${T.border}`}}>
-        <span>Price</span><span style={{textAlign:"right"}}>Qty</span><span style={{textAlign:"right"}}>Time</span>
-      </div>
-      {trades.map((tr,i)=>(
-        <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"1.5px 8px"}}>
-          <span style={{fontSize:10,color:tr.buy?T.green:T.red,fontFamily:T.mono}}>{fmtP(tr.p)}</span>
-          <span style={{fontSize:10,textAlign:"right",color:T.txt2,fontFamily:T.mono}}>{tr.q.toFixed(4)}</span>
-          <span style={{fontSize:10,textAlign:"right",color:T.txt3}}>{tr.t}</span>
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderChart=()=>(
-    <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
-      <div style={{padding:"4px 10px",borderBottom:`1px solid ${T.border}`,display:"flex",
-                   gap:3,alignItems:"center",flexShrink:0,background:T.panel}}>
-        {INTERVALS.map(iv=>(
-          <button key={iv} onClick={()=>setTfm(iv)}
-                  style={{padding:"2px 7px",background:tfm===iv?T.tealBg:"transparent",
-                          color:tfm===iv?T.teal:T.txt3,border:`1px solid ${tfm===iv?T.tealDm:"transparent"}`,
-                          borderRadius:3,fontSize:10,fontWeight:tfm===iv?700:400}}>
-            {iv}
-          </button>
-        ))}
-        <div style={{marginLeft:"auto",display:"flex",gap:14,fontSize:9,color:T.txt3,alignItems:"center"}}>
-          <span>H: <span style={{color:T.green,fontFamily:T.mono}}>{fmtP(ticker.high)}</span></span>
-          <span>L: <span style={{color:T.red,fontFamily:T.mono}}>{fmtP(ticker.low)}</span></span>
-          <span>V: <span style={{color:T.txt2,fontFamily:T.mono}}>{fmt(ticker.vol||0,0)}</span></span>
-        </div>
-      </div>
-      <div style={{flex:"0 0 65%",minHeight:0}}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={klines} margin={{top:6,right:4,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="1 6" stroke={T.border}/>
-            <XAxis dataKey="t" tick={{fill:T.txt3,fontSize:9,fontFamily:T.mono}} axisLine={false} tickLine={false}
-                   interval={Math.max(1,Math.floor(klines.length/8))}/>
-            <YAxis tick={{fill:T.txt3,fontSize:9,fontFamily:T.mono}} axisLine={false} tickLine={false}
-                   domain={["auto","auto"]} tickFormatter={fmtP} width={65}/>
-            <Tooltip contentStyle={{background:T.panel,border:`1px solid ${T.tealDm}`,borderRadius:4,fontSize:10,fontFamily:T.mono}}
-                     labelStyle={{color:T.txt2}} formatter={v=>[fmtP(v),"Close"]}/>
-            <Line type="monotone" dataKey="c" stroke={T.teal} strokeWidth={1.5} dot={false}/>
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{flex:"0 0 33%",minHeight:0}}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={klines} margin={{top:2,right:4,left:0,bottom:0}}>
-            <XAxis hide/><YAxis hide/>
-            <Tooltip contentStyle={{background:T.panel,border:`1px solid ${T.border}`,fontSize:10,fontFamily:T.mono}}
-                     formatter={v=>[fmt(v,0),"Vol"]} labelFormatter={()=>""}/>
-            <Bar dataKey="v" fill={T.tealDm}/>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-
-  const renderOrderEntry=()=>(
-    <div style={{padding:"8px 10px",background:T.panel,borderTop:`1px solid ${T.border}`,flexShrink:0}}>
-      <div style={{display:"flex",gap:3,marginBottom:6}}>
-        {["buy","sell"].map(side=>(
-          <button key={side} onClick={()=>setForm(f=>({...f,side}))}
-                  style={{flex:1,padding:"5px 0",
-                          background:form.side===side?(side==="buy"?"#062b1a":"#2e0a0a"):T.surf,
-                          color:form.side===side?(side==="buy"?T.green:T.red):T.txt3,
-                          border:`1px solid ${form.side===side?(side==="buy"?T.green:T.red):T.border}`,
-                          borderRadius:3,fontWeight:700,fontSize:10,textTransform:"uppercase",letterSpacing:.5}}>
-            {side}
-          </button>
-        ))}
-        {["limit","market"].map(type=>(
-          <button key={type} onClick={()=>setForm(f=>({...f,type}))}
-                  style={{flex:1,padding:"5px 0",
-                          background:form.type===type?T.surf:"transparent",
-                          color:form.type===type?T.txt1:T.txt3,
-                          border:`1px solid ${form.type===type?T.border:"transparent"}`,
-                          borderRadius:3,fontSize:9,textTransform:"capitalize"}}>
-            {type}
-          </button>
-        ))}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:form.type==="limit"?"1fr 1fr":"1fr",gap:4,marginBottom:5}}>
-        {form.type==="limit"&&(
-          <div>
-            <div style={{fontSize:8,color:T.txt3,marginBottom:2,textTransform:"uppercase"}}>Price</div>
-            <input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))}
-                   placeholder={fmtP(cp)}
-                   style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,borderRadius:3,
-                           padding:"4px 6px",color:T.txt1,fontSize:11,fontFamily:T.mono,boxSizing:"border-box"}}/>
-          </div>
-        )}
-        <div>
-          <div style={{fontSize:8,color:T.txt3,marginBottom:2,textTransform:"uppercase"}}>Qty ({sym.base})</div>
-          <input type="number" value={form.qty} onChange={e=>setForm(f=>({...f,qty:e.target.value}))}
-                 placeholder="0.0000"
-                 style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,borderRadius:3,
-                         padding:"4px 6px",color:T.txt1,fontSize:11,fontFamily:T.mono,boxSizing:"border-box"}}/>
-        </div>
-      </div>
-      {form.qty&&<div style={{fontSize:9,color:T.txt3,marginBottom:5,fontFamily:T.mono}}>
-        ≈ ${fmt((+form.qty||0)*(+form.price||cp))}
-      </div>}
-      <button onClick={placeOrder}
-              style={{width:"100%",padding:7,background:form.side==="buy"?T.green:T.red,
-                      color:"#000",border:"none",borderRadius:3,fontWeight:800,fontSize:11,letterSpacing:.5}}>
-        {form.side==="buy"?"▲ BUY":"▼ SELL"} {sym.base}
-      </button>
-    </div>
-  );
-
-  /* ── Positions sub-render ── */
-  const renderPositions=()=>(
-    <div style={{borderTop:`1px solid ${T.border}`,background:T.panel}}>
-      <div style={{padding:"5px 8px",fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:1}}>Positions</div>
-      {port.positions.length===0
-        ?<div style={{padding:"6px 8px",fontSize:9,color:T.txt3,textAlign:"center"}}>—</div>
-        :port.positions.map((pos,i)=>{
-          const tk=tickers[SYMBOLS.find(x=>x.name===pos.sym)?.id]||{};
-          const ppnl=tk.price?(tk.price-pos.avg)*pos.qty:0;
-          return(
-            <div key={i} style={{padding:"4px 8px",borderTop:`1px solid ${T.border}`}}>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:10,fontWeight:600,color:T.txt2,fontFamily:T.mono}}>{pos.base}</span>
-                <span style={{fontSize:10,color:ppnl>=0?T.green:T.red,fontFamily:T.mono}}>{ppnl>=0?"+":""}${fmt(ppnl)}</span>
-              </div>
-              <div style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{pos.qty.toFixed(5)} @ {fmtP(pos.avg)}</div>
-            </div>
-          );
-        })
-      }
-    </div>
-  );
-
-  const renderOrders=()=>(
-    <div style={{borderTop:`1px solid ${T.border}`,background:T.panel}}>
-      <div style={{padding:"5px 8px",fontSize:9,color:T.txt3,textTransform:"uppercase",letterSpacing:1}}>Orders</div>
-      {port.orders.length===0
-        ?<div style={{padding:"6px 8px",fontSize:9,color:T.txt3,textAlign:"center"}}>—</div>
-        :port.orders.slice(0,6).map(o=>(
-          <div key={o.id} style={{padding:"3px 8px",borderTop:`1px solid ${T.border}`}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontSize:9,color:o.side==="buy"?T.green:T.red,fontWeight:700,fontFamily:T.mono,textTransform:"uppercase"}}>
-                {o.side} {o.sym.split("/")[0]}
-              </span>
-              <span style={{fontSize:8,color:T.teal}}>✓</span>
-            </div>
-            <div style={{fontSize:9,color:T.txt3,fontFamily:T.mono}}>{o.qty.toFixed(4)} @ {fmtP(o.price)}</div>
-          </div>
-        ))
-      }
-    </div>
-  );
-
-  /* ══ MAIN RENDER ══ */
-  return (
-    <div style={{fontFamily:"'Inter',system-ui,sans-serif",background:T.bg,color:T.txt1,
-                 height:"100vh",display:"flex",flexDirection:"column",fontSize:12,overflow:"hidden"}}>
-
-      {/* HEADER */}
-      <div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,padding:"6px 12px",
-                   display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}}>
-        <span style={{fontSize:10,fontWeight:700,color:T.txt3,letterSpacing:1.5,textTransform:"uppercase"}}>PLT Trader Desk</span>
-        <div style={{width:1,height:12,background:T.border}}/>
-        <div style={{background:T.tealBg,border:`1px solid ${T.tealDm}`,borderRadius:2,padding:"2px 8px"}}>
-          <span style={{fontSize:11,fontWeight:700,color:T.teal,fontFamily:T.mono}}>{sym.short}</span>
-        </div>
-        <span style={{fontSize:18,fontWeight:800,color:isUp?T.green:T.red,fontFamily:T.mono}}>{fmtP(cp)}</span>
-        <span style={{fontSize:11,color:isUp?T.green:T.red,fontWeight:600,fontFamily:T.mono}}>
-          {isUp?"▲":"▼"}{Math.abs(chg).toFixed(2)}%
-        </span>
-        <div style={{width:1,height:12,background:T.border}}/>
-        <span style={{fontSize:9,color:T.txt3}}>BAL: <span style={{color:T.txt1,fontFamily:T.mono}}>${fmt(port.balance)}</span></span>
-        <span style={{fontSize:9,color:T.txt3}}>P&L: <span style={{color:totalPnl>=0?T.green:T.red,fontFamily:T.mono}}>{totalPnl>=0?"+":""}${fmt(totalPnl)}</span></span>
-        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5}}>
-          <span style={{width:5,height:5,borderRadius:"50%",background:live?T.teal:T.txt3,display:"inline-block"}}/>
-          <span style={{fontSize:8,color:live?T.teal:T.txt3,textTransform:"uppercase",letterSpacing:1.5}}>{live?"LIVE":"CONNECTING..."}</span>
-        </div>
-      </div>
-
-      {mobile ? (
-        <>
-          {/* MOBILE – symbol strip */}
-          <div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,display:"flex",overflowX:"auto",flexShrink:0}}>
-            {SYMBOLS.map(s=>{
-              const tk=tickers[s.id]||{};
-              const up=(tk.change||0)>=0;
-              const sel=sym.id===s.id;
-              return(
-                <div key={s.id} onClick={()=>setSym(s)}
-                     style={{padding:"5px 12px",cursor:"pointer",flexShrink:0,minWidth:80,
-                             borderBottom:`2px solid ${sel?T.teal:"transparent"}`,background:sel?T.tealBg:"transparent"}}>
-                  <div style={{fontSize:9,fontWeight:600,color:sel?T.teal:T.txt3,fontFamily:T.mono}}>{s.short}</div>
-                  <div style={{fontSize:11,color:up?T.green:T.red,fontFamily:T.mono}}>{fmtP(tk.price)}</div>
-                </div>
-              );
-            })}
-          </div>
-          {/* MOBILE – tabs */}
-          <div style={{background:T.panel,borderBottom:`1px solid ${T.border}`,display:"flex",flexShrink:0}}>
-            {[["chart","Chart"],["book","Book"],["trades","Trades"],["order","Order"]].map(([k,l])=>(
-              <button key={k} onClick={()=>setMtab(k)}
-                      style={{flex:1,padding:"8px 4px",background:"transparent",
-                              color:mtab===k?T.teal:T.txt3,border:"none",
-                              borderBottom:`2px solid ${mtab===k?T.teal:"transparent"}`,
-                              fontSize:11,fontWeight:600}}>
-                {l}
-              </button>
-            ))}
-          </div>
-          {/* MOBILE – panels */}
-          <div style={{flex:1,minHeight:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-            {mtab==="chart"  && <div style={{flex:1,minHeight:0}}>{renderChart()}</div>}
-            {mtab==="book"   && <div style={{flex:1,minHeight:0}}>{renderBook()}</div>}
-            {mtab==="trades" && <div style={{flex:1,minHeight:0}}>{renderTrades()}</div>}
-            {mtab==="order"  && (
-              <div style={{flex:1,overflow:"auto",padding:10}}>
-                {renderOrderEntry()}
-                <div style={{marginTop:10}}>{renderPositions()}</div>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        /* DESKTOP – 4-column grid */
-        <div style={{display:"grid",gridTemplateColumns:"172px 1fr 172px 155px",
-                     gap:1,background:T.border,flex:1,minHeight:0}}>
-
-          {/* COL 1: Watchlist + Positions */}
-          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden"}}>
-            <div style={{padding:"5px 8px",borderBottom:`1px solid ${T.border}`,fontSize:9,color:T.txt3,
-                         textTransform:"uppercase",letterSpacing:1,background:T.panel,
-                         display:"flex",justifyContent:"space-between"}}>
-              <span>Watchlist</span><span style={{color:T.teal}}>8 pairs</span>
-            </div>
-            {renderWatchlist()}
-            {renderPositions()}
-          </div>
-
-          {/* COL 2: Chart + Order Entry */}
-          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0}}>
-            <div style={{flex:1,minHeight:0}}>{renderChart()}</div>
-            {renderOrderEntry()}
-          </div>
-
-          {/* COL 3: Order Book */}
-          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0}}>
-            <div style={{padding:"5px 8px",borderBottom:`1px solid ${T.border}`,fontSize:9,color:T.txt3,
-                         textTransform:"uppercase",letterSpacing:1,background:T.panel,
-                         display:"flex",justifyContent:"space-between"}}>
-              <span>Order Book</span>
-              <span><span style={{color:T.red}}>A</span>/<span style={{color:T.green}}>B</span></span>
-            </div>
-            <div style={{flex:1,minHeight:0}}>{renderBook()}</div>
-          </div>
-
-          {/* COL 4: Trade Feed + Orders */}
-          <div style={{background:T.bg,display:"flex",flexDirection:"column",minHeight:0}}>
-            <div style={{padding:"5px 8px",borderBottom:`1px solid ${T.border}`,fontSize:9,color:T.txt3,
-                         textTransform:"uppercase",letterSpacing:1,background:T.panel}}>
-              Trade Feed
-            </div>
-            <div style={{flex:1,minHeight:0}}>{renderTrades()}</div>
-            {renderOrders()}
-          </div>
-        </div>
-      )}
-
-      {/* TICKER TAPE */}
-      <div style={{background:T.panel,borderTop:`1px solid ${T.border}`,overflow:"hidden",flexShrink:0,height:24}}>
-        <div style={{display:"inline-flex",animation:"tickScroll 45s linear infinite",
-                     whiteSpace:"nowrap",height:"100%",alignItems:"center"}}>
-          {[0,1].map(ri=>(
-            <span key={ri} style={{display:"inline-flex"}}>
-              {SYMBOLS.map(s=>{
-                const tk=tickers[s.id]||{};
-                const up=(tk.change||0)>=0;
-                return(
-                  <span key={s.id} style={{display:"inline-flex",alignItems:"center",gap:5,
-                                           padding:"0 18px",fontSize:9,borderRight:`1px solid ${T.border}`}}>
-                    <span style={{color:T.txt3,fontFamily:T.mono}}>{s.short}</span>
-                    <span style={{color:up?T.green:T.red,fontFamily:T.mono}}>{fmtP(tk.price)}</span>
-                    <span style={{fontSize:8,color:up?T.green:T.red,fontFamily:T.mono}}>
-                      {up?"▲":"▼"}{fmt(Math.abs(tk.change||0),2)}%
-                    </span>
-                  </span>
-                );
-              })}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+}
+function connectBook(){
+  wsD&&wsD.close();
+  wsD=new WebSocket(`wss://stream.binance.com:9443/ws/${sym().id}@depth20@100ms`);
+  wsD.onmessage=({data})=>{
+    const d=JSON.parse(data);
+    book.bids=(d.bids||[]).slice(0,13).map(([p,q])=>({p:+p,q:+q}));
+    book.asks=(d.asks||[]).slice(0,13).map(([p,q])=>({p:+p,q:+q}));
+    renderBook();
+  };
+}
+function connectTrades(){
+  wsTr&&wsTr.close();
+  wsTr=new WebSocket(`wss://stream.binance.com:9443/ws/${sym().id}@trade`);
+  wsTr.onmessage=({data})=>{
+    const d=JSON.parse(data);
+    trades.unshift({p:+d.p,q:+d.q,t:new Date(d.T).toLocaleTimeString(),buy:!d.m});
+    if(trades.length>80)trades.length=80;
+    renderTrades();
+  };
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<TraderDesk />);
+/* ── KLINES ──────────────────────── */
+async function loadKlines(){
+  try{
+    const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym().id.toUpperCase()}&interval=${chartTfm}&limit=120`);
+    const raw=await r.json();
+    if(!Array.isArray(raw))return;
+    klines=raw.map(k=>({t:new Date(+k[0]).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+    updateCharts();
+  }catch(e){}
+}
+
+/* ── CHARTS ──────────────────────── */
+const chartCfg=(type,color)=>({
+  type,
+  data:{labels:[],datasets:[{data:[],borderColor:color,backgroundColor:color,borderWidth:type==='line'?1.5:undefined,pointRadius:0,tension:.1,fill:false,borderWidth:0}]},
+  options:{
+    responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,
+      backgroundColor:'#07090c',borderColor:'#00604e',borderWidth:1,titleColor:'#4e6878',bodyColor:TEAL,
+      bodyFont:{family:'IBM Plex Mono',size:10},callbacks:{label:ctx=>fp(ctx.parsed.y)}}},
+    scales:{
+      x:{grid:{color:'#0c1a26'},ticks:{color:'#283848',font:{family:'IBM Plex Mono',size:9},maxTicksLimit:8}},
+      y:{position:'right',grid:{color:'#0c1a26'},ticks:{color:'#283848',font:{family:'IBM Plex Mono',size:9}},callback:fp}
+    }
+  }
+});
+const volCfg=()=>({
+  type:'bar',
+  data:{labels:[],datasets:[{data:[],backgroundColor:'#00604e',borderWidth:0}]},
+  options:{responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#07090c',borderColor:'#14202a',borderWidth:1,
+      bodyColor:'#4e6878',bodyFont:{family:'IBM Plex Mono',size:9},callbacks:{label:ctx=>`Vol: ${fn(ctx.parsed.y,0)}`}}},
+    scales:{x:{display:false},y:{display:false}}}
+});
+
+function initCharts(){
+  priceChart=new Chart(el('pc').getContext('2d'),chartCfg('line',TEAL));
+  volChart  =new Chart(el('vc').getContext('2d'),volCfg());
+}
+function updateCharts(){
+  const lb=klines.map(k=>k.t),cl=klines.map(k=>k.c),vl=klines.map(k=>k.v);
+  [priceChart,mobPC].forEach(c=>{if(!c)return;c.data.labels=lb;c.data.datasets[0].data=cl;c.update('none');});
+  [volChart,mobVC].forEach(c=>{if(!c)return;c.data.labels=lb;c.data.datasets[0].data=vl;c.update('none');});
+  const tk=tickers[sym().id]||{};
+  el('s-hi').textContent=fp(tk.high);el('s-lo').textContent=fp(tk.low);el('s-vl').textContent=fn(tk.vol||0,0);
+}
+
+/* ── SYMBOL SELECT ───────────────── */
+function selectSym(idx){
+  selIdx=idx;trades=[];book={bids:[],asks:[]};
+  connectBook();connectTrades();loadKlines();
+  renderWL();renderMobStrip();renderHeader();updateOE();
+  if(mobileTab!=='chart')renderMobCt();
+  else renderMobCt();
+}
+
+/* ── RENDER: header ──────────────── */
+function renderHeader(){
+  const s=sym(),tk=tickers[s.id]||{},up=(tk.change||0)>=0;
+  el('h-sym').textContent=s.short;
+  el('h-price').textContent=fp(tk.price);el('h-price').className='mono '+(up?'g':'r');
+  el('h-chg').textContent=(up?'▲':'▼')+Math.abs(tk.change||0).toFixed(2)+'%';el('h-chg').className='mono '+(up?'g':'r');
+  el('ob-last').textContent=fp(tk.price);el('ob-last').className='mono '+(up?'g':'r');
+  el('s-hi').textContent=fp(tk.high);el('s-lo').textContent=fp(tk.low);el('s-vl').textContent=fn(tk.vol||0,0);
+  const pnl=portfolio.positions.reduce((s,pos)=>{const t=tickers[SYMS.find(x=>x.name===pos.sym)?.id];return s+(t?(t.price-pos.avg)*pos.qty:0);},0);
+  el('h-pnl').innerHTML=`P&L: <b class="mono ${pnl>=0?'g':'r'}">${pnl>=0?'+':''}$${fn(pnl)}</b>`;
+  el('h-bal').innerHTML=`BAL: <b class="mono" style="color:#b8ccd8">$${fn(portfolio.balance)}</b>`;
+}
+function setLive(v){el('h-live').className=v?'live-on':'';el('live-lbl').textContent=v?'LIVE':'CONNECTING';}
+
+/* ── RENDER: watchlist ───────────── */
+function renderWL(){
+  el('wl-list').innerHTML=SYMS.map((s,i)=>{
+    const tk=tickers[s.id]||{},up=(tk.change||0)>=0,on=i===selIdx;
+    return`<div class="wl-r${on?' on':''}" onclick="selectSym(${i})">
+      <span class="wl-s">${s.short}</span>
+      <span class="wl-p ${tk.price?(up?'g':'r'):'d'}">${fp(tk.price)}</span>
+      <span class="wl-c ${up?'g':'r'}">${up?'+':''}${fn(tk.change||0,2)}%</span>
+    </div>`;
+  }).join('');
+}
+function flashRow(key,up){
+  const i=SYMS.findIndex(s=>s.id===key);
+  const rows=document.querySelectorAll('.wl-r');
+  if(!rows[i])return;
+  rows[i].classList.remove('fg','fr');void rows[i].offsetWidth;rows[i].classList.add(up?'fg':'fr');
+}
+
+/* ── RENDER: positions ───────────── */
+function renderPos(){
+  if(!portfolio.positions.length){el('pos-list').innerHTML='<div class="empty">—</div>';return;}
+  el('pos-list').innerHTML=portfolio.positions.map(pos=>{
+    const tk=tickers[SYMS.find(x=>x.name===pos.sym)?.id]||{};
+    const pp=tk.price?(tk.price-pos.avg)*pos.qty:0;
+    return`<div class="pos-r"><div class="pos-top"><span class="pos-b">${pos.base}</span><span class="pos-p ${pp>=0?'g':'r'}">${pp>=0?'+':''}$${fn(pp)}</span></div><div class="pos-d">${pos.qty.toFixed(5)} @ ${fp(pos.avg)}</div></div>`;
+  }).join('');
+}
+
+/* ── RENDER: order book ──────────── */
+function renderBook(){
+  const mA=Math.max(...book.asks.map(a=>a.q),1),mB=Math.max(...book.bids.map(b=>b.q),1);
+  el('ob-asks').innerHTML=[...book.asks].reverse().map(a=>`<div class="ob-r"><div class="ob-bar" style="background:${RED};width:${(a.q/mA)*100}%"></div><span class="ob-p r">${fp(a.p)}</span><span class="ob-q">${a.q.toFixed(3)}</span></div>`).join('');
+  el('ob-bids').innerHTML=book.bids.map(b=>`<div class="ob-r"><div class="ob-bar" style="background:${GREEN};width:${(b.q/mB)*100}%"></div><span class="ob-p g">${fp(b.p)}</span><span class="ob-q">${b.q.toFixed(3)}</span></div>`).join('');
+}
+
+/* ── RENDER: trades ──────────────── */
+function renderTrades(){
+  const html=trades.slice(0,60).map(tr=>`<div class="tr-r"><span class="tr-p ${tr.buy?'g':'r'}">${fp(tr.p)}</span><span class="tr-q">${tr.q.toFixed(4)}</span><span class="tr-t">${tr.t}</span></div>`).join('');
+  el('trades-list').innerHTML=html;
+  const mt=el('mob-tlist');if(mt)mt.innerHTML=html;
+}
+
+/* ── RENDER: orders ──────────────── */
+function renderOrders(){
+  if(!portfolio.orders.length){el('ord-list').innerHTML='<div class="empty">—</div>';return;}
+  el('ord-list').innerHTML=portfolio.orders.slice(0,6).map(o=>`<div class="ord-r"><div class="ord-top"><span class="ord-s ${o.side==='buy'?'g':'r'}">${o.side} ${o.sym.split('/')[0]}</span><span class="t" style="font-size:8px">✓</span></div><div class="ord-d">${o.qty.toFixed(4)} @ ${fp(o.price)}</div></div>`).join('');
+}
+
+/* ── RENDER: tape ────────────────── */
+function renderTape(){
+  const h=SYMS.map(s=>{const tk=tickers[s.id]||{},up=(tk.change||0)>=0;return`<span class="ti"><span class="ti-s">${s.short}</span><span class="ti-p ${up?'g':'r'}">${fp(tk.price)}</span><span class="ti-c ${up?'g':'r'}">${up?'▲':'▼'}${fn(Math.abs(tk.change||0),2)}%</span></span>`;}).join('');
+  el('tape-in').innerHTML=h+h;
+}
+
+/* ── RENDER: mobile strip ────────── */
+function renderMobStrip(){
+  el('mob-strip').innerHTML=SYMS.map((s,i)=>{const tk=tickers[s.id]||{},up=(tk.change||0)>=0,on=i===selIdx;return`<div class="msi${on?' on':''}" onclick="selectSym(${i})"><div class="msi-s">${s.short}</div><div class="msi-p ${up?'g':'r'}">${fp(tk.price)}</div></div>`;}).join('');
+}
+
+/* ── MOBILE CONTENT ──────────────── */
+function setMtab(tab){
+  mobileTab=tab;
+  document.querySelectorAll('.mtab').forEach((b,i)=>b.classList.toggle('on',['chart','book','trades','order'][i]===tab));
+  renderMobCt();
+}
+function renderMobCt(){
+  const mc=el('mob-ct'),tk=tickers[sym().id]||{},up=(tk.change||0)>=0;
+  const mA=Math.max(...book.asks.map(a=>a.q),1),mB=Math.max(...book.bids.map(b=>b.q),1);
+  if(mobileTab==='chart'){
+    mc.innerHTML=`
+      <div style="padding:4px 10px;border-bottom:1px solid #14202a;display:flex;gap:3px;flex-shrink:0;background:#07090c">
+        ${IVS.map(iv=>`<button class="iv${iv===chartTfm?' on':''}" onclick="setTfm('${iv}')">${iv}</button>`).join('')}
+      </div>
+      <div id="mob-pc-wrap" style="flex:0 0 62%;min-height:0;position:relative"><canvas id="mob-pc"></canvas></div>
+      <div id="mob-vc-wrap" style="flex:0 0 30%;min-height:0;position:relative"><canvas id="mob-vc"></canvas></div>`;
+    mobPC&&mobPC.destroy();mobVC&&mobVC.destroy();
+    mobPC=new Chart(el('mob-pc').getContext('2d'),chartCfg('line',TEAL));
+    mobVC=new Chart(el('mob-vc').getContext('2d'),volCfg());
+    updateCharts();
+  } else if(mobileTab==='book'){
+    mc.innerHTML=`<div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:grid;grid-template-columns:1fr auto;padding:3px 8px;font-size:9px;color:#283848;text-transform:uppercase;border-bottom:1px solid #14202a;flex-shrink:0"><span>Price</span><span>Qty</span></div>
+      <div style="flex:1;overflow:auto">
+        <div style="display:flex;flex-direction:column;justify-content:flex-end">
+          ${[...book.asks].reverse().map(a=>`<div class="ob-r"><div class="ob-bar" style="background:${RED};width:${(a.q/mA)*100}%"></div><span class="ob-p r">${fp(a.p)}</span><span class="ob-q">${a.q.toFixed(3)}</span></div>`).join('')}
+        </div>
+        <div style="padding:5px 8px;background:#0c1016;border-top:1px solid #14202a;border-bottom:1px solid #14202a;text-align:center">
+          <span class="mono ${up?'g':'r'}" style="font-size:13px;font-weight:800">${fp(tk.price)}</span>
+          <span class="d" style="font-size:8px;margin-left:6px">LAST</span>
+        </div>
+        ${book.bids.map(b=>`<div class="ob-r"><div class="ob-bar" style="background:${GREEN};width:${(b.q/mB)*100}%"></div><span class="ob-p g">${fp(b.p)}</span><span class="ob-q">${b.q.toFixed(3)}</span></div>`).join('')}
+      </div></div>`;
+  } else if(mobileTab==='trades'){
+    mc.innerHTML=`<div class="tf-hr" style="flex-shrink:0"><span>Price</span><span>Qty</span><span>Time</span></div>
+      <div id="mob-tlist" style="flex:1;overflow:auto">
+        ${trades.slice(0,60).map(tr=>`<div class="tr-r"><span class="tr-p ${tr.buy?'g':'r'}">${fp(tr.p)}</span><span class="tr-q">${tr.q.toFixed(4)}</span><span class="tr-t">${tr.t}</span></div>`).join('')}
+      </div>`;
+  } else {
+    mc.innerHTML=`<div style="flex:1;overflow:auto;padding:10px">
+      <div style="display:flex;gap:3px;margin-bottom:6px">
+        <button class="oe-side ${formSide==='buy'?'buy-on':''}" onclick="setSide('buy')">Buy</button>
+        <button class="oe-side ${formSide==='sell'?'sell-on':''}" onclick="setSide('sell')">Sell</button>
+        <button class="oe-type ${formType==='limit'?'on':''}" onclick="setType('limit')">Limit</button>
+        <button class="oe-type ${formType==='market'?'on':''}" onclick="setType('market')">Market</button>
+      </div>
+      <div style="display:grid;grid-template-columns:${formType==='limit'?'1fr 1fr':'1fr'};gap:4px;margin-bottom:5px">
+        ${formType==='limit'?`<div class="oef"><label>Price</label><input type="number" id="m-p" placeholder="${fp(tk.price)}"/></div>`:''}
+        <div class="oef"><label>Qty (${sym().base})</label><input type="number" id="m-q" placeholder="0.0000"/></div>
+      </div>
+      <button onclick="placeOrdMob()" style="width:100%;padding:7px;border:none;border-radius:3px;font-weight:800;font-size:11px;color:#000;background:${formSide==='buy'?GREEN:RED};cursor:pointer">
+        ${formSide==='buy'?'▲ BUY':'▼ SELL'} ${sym().base}
+      </button>
+      ${portfolio.positions.map(pos=>{const t=tickers[SYMS.find(x=>x.name===pos.sym)?.id]||{},pp=t.price?(t.price-pos.avg)*pos.qty:0;
+        return`<div style="margin-top:8px;background:#07090c;border:1px solid #14202a;border-radius:4px;padding:7px 10px">
+          <div style="display:flex;justify-content:space-between"><span class="mono" style="font-weight:700;font-size:11px">${pos.sym}</span><span class="mono ${pp>=0?'g':'r'}" style="font-size:11px">${pp>=0?'+':''}$${fn(pp)}</span></div>
+          <div class="mono" style="font-size:10px;color:#4e6878;margin-top:2px">${pos.qty.toFixed(5)} @ ${fp(pos.avg)}</div>
+        </div>`;}).join('')}
+    </div>`;
+  }
+}
+
+/* ── ORDER ACTIONS ───────────────── */
+function setSide(s){
+  formSide=s;
+  el('ob-buy').className='oe-side'+(s==='buy'?' buy-on':'');
+  el('ob-sell').className='oe-side'+(s==='sell'?' sell-on':'');
+  el('sub-btn').style.background=s==='buy'?GREEN:RED;
+  el('sub-btn').textContent=`${s==='buy'?'▲ BUY':'▼ SELL'} ${sym().base}`;
+  if(mobileTab==='order')renderMobCt();
+}
+function setType(t){
+  formType=t;
+  el('ot-lim').className='oe-type'+(t==='limit'?' on':'');
+  el('ot-mkt').className='oe-type'+(t==='market'?' on':'');
+  el('pf').style.display=t==='limit'?'':'none';
+  el('oe-fields').style.gridTemplateColumns=t==='limit'?'1fr 1fr':'1fr';
+  if(mobileTab==='order')renderMobCt();
+}
+function setTfm(t){
+  chartTfm=t;
+  document.querySelectorAll('.iv').forEach(b=>b.classList.toggle('on',b.textContent===t));
+  loadKlines();
+  if(mobileTab==='chart')renderMobCt();
+}
+function updateOE(){
+  el('ql').textContent=`Qty (${sym().base})`;
+  el('sub-btn').textContent=`${formSide==='buy'?'▲ BUY':'▼ SELL'} ${sym().base}`;
+}
+function calcTotal(){
+  const p=formType==='market'?(tickers[sym().id]?.price||0):+(el('inp-p')?.value||0);
+  const q=+(el('inp-q')?.value||0);
+  el('oe-total').textContent=q?`≈ $${fn(p*q)}`:'';
+}
+function doPlace(price,qty){
+  if(!qty||qty<=0||!price)return;
+  const tot=price*qty,s=sym();
+  if(formSide==='buy'&&tot>portfolio.balance){alert('Saldo tidak cukup');return;}
+  portfolio.balance+=formSide==='buy'?-tot:tot;
+  const idx=portfolio.positions.findIndex(p=>p.sym===s.name);
+  if(formSide==='buy'){
+    if(idx>=0){const nq=portfolio.positions[idx].qty+qty;portfolio.positions[idx]={...portfolio.positions[idx],qty:nq,avg:(portfolio.positions[idx].avg*portfolio.positions[idx].qty+price*qty)/nq};}
+    else portfolio.positions.push({sym:s.name,base:s.base,qty,avg:price});
+  }else if(idx>=0){const nq=portfolio.positions[idx].qty-qty;if(nq<=0.000001)portfolio.positions.splice(idx,1);else portfolio.positions[idx].qty=nq;}
+  portfolio.orders.unshift({id:Date.now(),sym:s.name,side:formSide,price,qty,total:tot,at:new Date().toLocaleTimeString()});
+  if(portfolio.orders.length>30)portfolio.orders.length=30;
+  renderPos();renderOrders();renderHeader();
+}
+function placeOrder(){
+  const p=formType==='market'?(tickers[sym().id]?.price||0):+(el('inp-p').value||0);
+  const q=+(el('inp-q').value||0);
+  doPlace(p,q);el('inp-p').value='';el('inp-q').value='';el('oe-total').textContent='';
+}
+function placeOrdMob(){
+  const pe=el('m-p'),qe=el('m-q');
+  const p=formType==='market'?(tickers[sym().id]?.price||0):+(pe?.value||0);
+  const q=+(qe?.value||0);
+  doPlace(p,q);renderMobCt();
+}
+
+/* ── INIT ────────────────────────── */
+function init(){
+  el('iv-btns').innerHTML=IVS.map(iv=>`<button class="iv${iv===chartTfm?' on':''}" onclick="setTfm('${iv}')">${iv}</button>`).join('');
+  el('inp-p').addEventListener('input',calcTotal);
+  el('inp-q').addEventListener('input',calcTotal);
+  initCharts();
+  connectTickers();connectBook();connectTrades();loadKlines();
+  window.setInterval(loadKlines,30000);
+  renderWL();renderMobStrip();renderTape();renderMobCt();
+}
+document.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
 </html>
